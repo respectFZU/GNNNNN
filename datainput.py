@@ -96,24 +96,24 @@ with open("data/edge_index.txt", "w") as f:
 print("Edge Index saved to 'edge_index.txt'")
 
 
-# 验证边索引是否准确
-def are_directly_connected(G, node1, node2):
-    # 使用实际的节点ID
-    return G.has_edge(node1, node2)
-
-
-node1 = '328'
-node2 = '249'
-
-connected_nodes = list(G.neighbors(node1))
-
-# 输出直接连接的节点
-print(f"Nodes directly connected to node {node1}: {connected_nodes}")
-
-if are_directly_connected(G, node1, node2):
-    print(f"Node {node1} and Node {node2} are directly connected.")
-else:
-    print(f"Node {node1} and Node {node2} are not directly connected.")
+# # 验证边索引是否准确
+# def are_directly_connected(G, node1, node2):
+#     # 使用实际的节点ID
+#     return G.has_edge(node1, node2)
+#
+#
+# node1 = '328'
+# node2 = '249'
+#
+# connected_nodes = list(G.neighbors(node1))
+#
+# # 输出直接连接的节点
+# print(f"Nodes directly connected to node {node1}: {connected_nodes}")
+#
+# if are_directly_connected(G, node1, node2):
+#     print(f"Node {node1} and Node {node2} are directly connected.")
+# else:
+#     print(f"Node {node1} and Node {node2} are not directly connected.")
 
 # # 可视化图
 # pos = nx.get_node_attributes(G, 'pos')

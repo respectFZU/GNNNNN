@@ -3,13 +3,14 @@ from torch_geometric.data import Data
 from torch_geometric.nn import SAGEConv
 import networkx as nx
 from datainput import G, edge_index
-import random
+import torch.nn.functional as F
 
-# 假设我们有节点特征
-input_dim = 16  # 输入特征维度
-hidden_dim = 128  # 增加隐藏层维度
-output_dim = G.number_of_nodes()  # 输出特征维度，表示节点数
-node_features = torch.randn((G.number_of_nodes(), input_dim))  # 随机特征
+# 增强节点特征
+input_dim = 32  # 增加输入特征维度
+hidden_dim = 128
+output_dim = G.number_of_nodes() + 1
+node_features = torch.randn((G.number_of_nodes() + 1, input_dim))
+
 
 # 初始化模型
 class PathPredictor(torch.nn.Module):
@@ -18,6 +19,7 @@ class PathPredictor(torch.nn.Module):
         self.conv1 = SAGEConv(input_dim + 2, hidden_dim)
         self.conv2 = SAGEConv(hidden_dim, hidden_dim)
         self.conv3 = SAGEConv(hidden_dim, hidden_dim)
+        self.conv4 = SAGEConv(hidden_dim, hidden_dim)  # 增加一层
         self.fc = torch.nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x, edge_index, start_node, target_node):
@@ -30,25 +32,49 @@ class PathPredictor(torch.nn.Module):
         x = self.conv1(x, edge_index).relu()
         x = self.conv2(x, edge_index).relu()
         x = self.conv3(x, edge_index).relu()
+        x = self.conv4(x, edge_index).relu()  # 新增层
         x = self.fc(x)
         return x
 
+
+def custom_loss(output, shortest_path, target_node, G):
+    # 最短路径损失
+    path_loss = F.cross_entropy(output[shortest_path[:-1]], torch.tensor(shortest_path[1:], dtype=torch.long))
+
+    # 邻居关系损失
+    neighbor_loss = 0.0
+    for i in range(len(shortest_path) - 1):
+        current_node = shortest_path[i]
+        predicted_node = output[current_node].argmax().item()
+        if str(predicted_node) not in G.neighbors(str(current_node)):
+            neighbor_loss += 1.0
+
+    # 终点损失
+    end_node_loss = 0.0
+    predicted_end_node = output[shortest_path[-1]].argmax().item()
+    if predicted_end_node != target_node:
+        end_node_loss = 5.0  # 惩罚项
+
+    # 总损失
+    total_loss = path_loss + 0.5 * neighbor_loss + end_node_loss
+    return total_loss
+
+
 model = PathPredictor(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim)
 
-# 定义损失函数和优化器
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+# 定义优化器
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)  # 调整学习率
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
 # 确保 edge_index 的形状正确
 print(edge_index.shape)
 
 # 训练模型
-num_epochs = 5  # 增加训练轮数
+num_epochs = 20  # 增加训练轮数
 start_node = 1
 
 for epoch in range(num_epochs):
-    for target_node in range(1, G.number_of_nodes()):
+    for target_node in range(1, G.number_of_nodes() + 1):
         if start_node == target_node:
             continue
         try:
@@ -62,9 +88,7 @@ for epoch in range(num_epochs):
 
             output = model(path_data.x, path_data.edge_index, start_node, target_node)
 
-            target = torch.tensor(shortest_path[1:], dtype=torch.long)
-
-            loss = criterion(output[shortest_path[:-1]], target)
+            loss = custom_loss(output, shortest_path, target_node, G)
 
             loss.backward()
             optimizer.step()
@@ -88,7 +112,7 @@ correct_count = 0
 total_count = 0
 invalid_path_count = 0
 
-for target_node in range(1, G.number_of_nodes()):
+for target_node in range(1, G.number_of_nodes() + 1):
     if start_node == target_node:
         continue
 
@@ -100,26 +124,27 @@ for target_node in range(1, G.number_of_nodes()):
             output = model(node_features, edge_index, start_node, target_node)
             predicted_path = [start_node]
             current_node = start_node
+            valid_path = True
 
             while current_node != target_node:
                 next_node = output[current_node].argmax().item()
-                predicted_path.append(next_node)
-                current_node = next_node
-                if len(predicted_path) > len(correct_path):
+
+                if not G.has_edge(str(current_node), str(next_node)):
+                    print(f"Invalid connection from {current_node} to {next_node}")
+                    valid_path = False
+                    invalid_path_count += 1
                     break
 
-            if predicted_path[-1] != target_node:
+                predicted_path.append(next_node)
+                current_node = next_node
+
+                if len(predicted_path) > len(correct_path):
+                    valid_path = False
+                    break
+
+            if valid_path and predicted_path[-1] != target_node:
                 predicted_path.append(target_node)
 
-        # 检查预测路径中的非法连接
-        valid_path = True
-        for i in range(len(predicted_path) - 1):
-            if str(predicted_path[i + 1]) not in G.neighbors(str(predicted_path[i])):
-                print(f"Invalid connection from {predicted_path[i]} to {predicted_path[i + 1]}")
-                valid_path = False
-                break
-
-        # 计算准确率
         if valid_path and predicted_path == correct_path:
             correct_count += 1
 
