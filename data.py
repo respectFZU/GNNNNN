@@ -6,7 +6,7 @@ import torch
 import matplotlib.pyplot as plt
 
 # 读取JSON文件
-with open('1015.json', 'r') as file:
+with open('../data/1015.json', 'r') as file:
     data = json.load(file)
 
 # 创建一个无向图
@@ -31,7 +31,7 @@ nodes = sorted(G.nodes, key=int)
 print("Sorted Nodes:", nodes)
 
 # 创建节点到索引的映射，从1开始
-node_to_index = {node: idx + 1 for idx, node in enumerate(nodes)}
+node_to_index = {node: idx +1 for idx, node in enumerate(nodes)}
 print("Node to Index Mapping:", node_to_index)
 
 # 创建一个新的图，使用排序后的节点和更新后的边
