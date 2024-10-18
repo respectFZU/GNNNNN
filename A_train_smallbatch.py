@@ -102,22 +102,25 @@ for epoch in range(num_epochs):
                     # 假设 num_classes 是类别的总数
                     num_classes = output.size(1)
 
+                    # 假设 num_classes 是类别的总数
+                    num_classes = output.size(1)
+
                     # 获取当前节点的输出
                     outputs = output[current_node].unsqueeze(0)
-                    # print("Model Output:", outputs)
-
-                    # 创建标签
-                    labels = torch.tensor([correct_node], dtype=torch.long)
-                    # print("Label Index:", labels)
 
                     # 创建 one-hot 编码的标签
                     one_hot_labels = torch.zeros(num_classes)
                     one_hot_labels[correct_node] = 1.0
-                    # print("One-hot Encoded Label:", one_hot_labels)
 
-                    # 使用交叉熵损失
-                    step_loss = F.cross_entropy(outputs, labels)
+                    # 将 one-hot 标签转换为整数标签
+                    integer_labels = torch.argmax(one_hot_labels).unsqueeze(0)
+
+                    # 使用整数标签计算交叉熵损失
+                    step_loss = F.cross_entropy(outputs, integer_labels)
+
                     print("Step Loss:", step_loss.item())
+                    # 使用交叉熵损失
+                    # step_loss = F.cross_entropy(outputs, one_hot_labels)
 
                     # 反向传播和优化
                     step_loss.backward()
@@ -153,8 +156,18 @@ for epoch in range(num_epochs):
                 else:
                     valid_path = False
 
-                    step_loss = F.cross_entropy(output[current_node].unsqueeze(0),
-                                                torch.tensor([correct_node], dtype=torch.long))
+                    # 获取当前节点的输出
+                    outputs = output[current_node].unsqueeze(0)
+
+                    # 创建 one-hot 编码的标签
+                    one_hot_labels = torch.zeros(num_classes)
+                    one_hot_labels[correct_node] = 1.0
+
+                    # 将 one-hot 标签转换为整数标签
+                    integer_labels = torch.argmax(one_hot_labels).unsqueeze(0)
+
+                    # 使用整数标签计算交叉熵损失
+                    step_loss = F.cross_entropy(outputs, integer_labels)
 
                     step_loss.backward()
                     optimizer.step()
